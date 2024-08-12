@@ -81,6 +81,8 @@ class Command(Enum):
     InputSourceUSBTypeA = "input_source_usb_type_a"
     InputSourceLAN = "input_source_lan"
     InputSourceUSBTypeB = "input_source_usb_type_b"
+    FilterTimeGet = "filter_time_get"
+    LampTimeGet = "lamp_time_get"
 
 
 commands = {
@@ -118,6 +120,8 @@ commands = {
     Command.InputSourceUSBTypeB: bytes.fromhex(
         "BE EF 03 06 00 FE D7 01 00 00 20 0C 00"
     ),
+    Command.FilterTimeGet: bytes.fromhex("BE EF 03 06 00 C2 F0 02 00 A0 10 00 00"),
+    Command.LampTimeGet: bytes.fromhex("BE EF 03 06 00 C2 FF 02 00 90 10 00 00"),
 }
 
 
@@ -269,6 +273,20 @@ class HitachiProjectorConnection:
 
     async def get_error_status(self):
         return await self.__build_get_status(Command.ErrorStatusGet, ErrorStatus)
+
+    async def get_filter_time(self):
+        return await self.__build_get_value(Command.FilterTimeGet)
+
+    async def get_lamp_time(self):
+        return await self.__build_get_value(Command.LampTimeGet)
+
+    async def __build_get_value(self, command):
+        reply_type, data = await self.async_send_cmd(commands[command])
+        if reply_type != ReplyType.DATA or data is None:
+            return reply_type, data
+
+        value = int.from_bytes(data, byteorder="little")
+        return (reply_type, value)
 
     async def __build_get_status(self, command, enum):
         reply_type, data = await self.async_send_cmd(commands[command])
