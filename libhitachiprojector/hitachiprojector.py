@@ -136,6 +136,22 @@ class HitachiProjectorConnection:
 
         return parse_reply(reply_type, reply)
 
+    async def get_power_status(self):
+        reply_type, data = await self.async_send_cmd(commands[Command.PowerGet])
+        if reply_type != ReplyType.DATA or data is None:
+            return reply_type, data
+
+        status = PowerStatus(int.from_bytes(data, byteorder="big"))
+        return (reply_type, status)
+
+    async def get_input_source(self):
+        reply_type, data = await self.async_send_cmd(commands[Command.InputSourceGet])
+        if reply_type != ReplyType.DATA or data is None:
+            return reply_type, data
+
+        status = InputSource(int.from_bytes(data, byteorder="big"))
+        return (reply_type, status)
+
     def send_cmd(self, cmd):
         (packet, connection_id) = make_packet(cmd)
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -190,7 +206,7 @@ async def main():
                     print(f"Input source: {status}")
 
                 case _:
-                    print(f"Command reply: {data}")
+                    print(f"Command reply: {data.hex()}")
 
         case _:
             print(f"bad response: {reply_type}, {data}")
