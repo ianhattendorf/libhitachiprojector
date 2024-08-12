@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 from enum import Enum
 import logging
 import os
@@ -64,9 +65,56 @@ class ReplyType(Enum):
     BUSY = 0x1F
 
 
+def parse_reply(reply_type, reply):
+    match reply_type:
+        case ReplyType.ACK:
+            logger.debug("Command ACKed")
+            return (ReplyType.ACK, None)
+
+        case ReplyType.NACK:
+            logger.debug("Command NACKed")
+            return (ReplyType.NACK, None)
+
+        case ReplyType.ERROR:
+            error_code = reply[1:3]
+            logger.debug(f"Command errored: {error_code.hex()}")
+            return (ReplyType.ERROR, error_code)
+
+        case ReplyType.DATA:
+            data = reply[1:3]
+            logger.debug(f"Command response: {data.hex()}")
+            return (ReplyType.DATA, data)
+
+        case ReplyType.BUSY:
+            status = reply[1:3]
+            logger.debug(f"Command busy: {status.hex()}")
+            return (ReplyType.BUSY, status)
+
+
 class HitachiProjectorConnection:
     def __init__(self, host):
         self.host = host
+
+    async def async_send_cmd(self, cmd):
+        logger.debug("async connecting")
+        (packet, connection_id) = make_packet(cmd)
+        reader, writer = await asyncio.open_connection(self.host, PORT)
+
+        logger.debug("sending")
+        writer.write(packet)
+        await writer.drain()
+
+        logger.debug("reading")
+        reply = await reader.read(256)
+        logger.debug(f"data=f{reply.hex()}")
+        reply_type = ReplyType(reply[0])
+
+        this_connection = connection_id == reply[-1]
+        if not this_connection:
+            logger.debug("Received reply for other connection")
+            return (False, None)
+
+        return parse_reply(reply_type, reply)
 
     def send_cmd(self, cmd):
         (packet, connection_id) = make_packet(cmd)
@@ -87,32 +135,10 @@ class HitachiProjectorConnection:
                 logger.debug("Received reply for other connection")
                 return (False, None)
 
-            match reply_type:
-                case ReplyType.ACK:
-                    logger.debug("Command ACKed")
-                    return (ReplyType.ACK, None)
-
-                case ReplyType.NACK:
-                    logger.debug("Command NACKed")
-                    return (ReplyType.NACK, None)
-
-                case ReplyType.ERROR:
-                    error_code = reply[1:3]
-                    logger.debug(f"Command errored: {error_code.hex()}")
-                    return (ReplyType.ERROR, error_code)
-
-                case ReplyType.DATA:
-                    data = reply[1:3]
-                    logger.debug(f"Command response: {data.hex()}")
-                    return (ReplyType.DATA, data)
-
-                case ReplyType.BUSY:
-                    status = reply[1:3]
-                    logger.debug(f"Command busy: {status.hex()}")
-                    return (ReplyType.BUSY, status)
+            return parse_reply(reply_type, reply)
 
 
-if __name__ == "__main__":
+async def main():
     logging.basicConfig(level=os.environ.get("LOG", logging.INFO))
 
     parser = argparse.ArgumentParser()
@@ -127,7 +153,7 @@ if __name__ == "__main__":
 
     print(f"Sending cmd: {command}")
 
-    (reply_type, data) = con.send_cmd(commands[command])
+    (reply_type, data) = await con.async_send_cmd(commands[command])
     match reply_type:
         case ReplyType.ACK:
             pass
@@ -144,3 +170,7 @@ if __name__ == "__main__":
             raise RuntimeError("bad response")
 
     print("Done")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
