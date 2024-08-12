@@ -71,6 +71,15 @@ class Command(Enum):
     PowerGet = "power_get"
     GammaGet = "gamma_get"
     InputSourceGet = "input_source_get"
+    InputSourceComputerIn1 = "input_source_computer_in_1"
+    InputSourceComputerIn2 = "input_source_computer_in_2"
+    InputSourceHDMI = "input_source_hdmi"
+    InputSourceComponent = "input_source_component"
+    InputSourceSVideo = "input_source_svideo"
+    InputSourceVideo = "input_source_video"
+    InputSourceUSBTypeA = "input_source_usb_type_a"
+    InputSourceLAN = "input_source_lan"
+    InputSourceUSBTypeB = "input_source_usb_type_b"
 
 
 commands = {
@@ -89,6 +98,25 @@ commands = {
     Command.PowerGet: bytes.fromhex("BE EF 03 06 00 19 D3 02 00 00 60 00 00"),
     Command.GammaGet: bytes.fromhex("BE EF 03 06 00 F4 F0 02 00 A1 30 00 00"),
     Command.InputSourceGet: bytes.fromhex("BE EF 03 06 00 CD D2 02 00 00 20 00 00"),
+    Command.InputSourceComputerIn1: bytes.fromhex(
+        "BE EF 03 06 00 FE D2 01 00 00 20 00 00"
+    ),
+    Command.InputSourceComputerIn2: bytes.fromhex(
+        "BE EF 03 06 00 3E D0 01 00 00 20 04 00"
+    ),
+    Command.InputSourceHDMI: bytes.fromhex("BE EF 03 06 00 0E D2 01 00 00 20 03 00"),
+    Command.InputSourceComponent: bytes.fromhex(
+        "BE EF 03 06 00 AE D1 01 00 00 20 05 00"
+    ),
+    Command.InputSourceSVideo: bytes.fromhex("BE EF 03 06 00 9E D3 01 00 00 20 02 00"),
+    Command.InputSourceVideo: bytes.fromhex("BE EF 03 06 00 6E D3 01 00 00 20 01 00"),
+    Command.InputSourceUSBTypeA: bytes.fromhex(
+        "BE EF 03 06 00 5E D1 01 00 00 20 06 00"
+    ),
+    Command.InputSourceLAN: bytes.fromhex("BE EF 03 06 00 CE D5 01 00 00 20 0B 00"),
+    Command.InputSourceUSBTypeB: bytes.fromhex(
+        "BE EF 03 06 00 FE D7 01 00 00 20 0C 00"
+    ),
 }
 
 
