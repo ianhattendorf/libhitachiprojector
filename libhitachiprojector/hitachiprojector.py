@@ -29,11 +29,23 @@ class InputSource(Enum):
     USBTypeB = 0x0C00
 
 
+class EcoModeStatus(Enum):
+    Normal = 0x0000
+    Eco = 0x0100
+
+
+class AutoEcoModeStatus(Enum):
+    Off = 0x0000
+    On = 0x0100
+
+
 class Command(Enum):
     AutoEcoModeOn = "auto_eco_mode_on"
     AutoEcoModeOff = "auto_eco_mode_off"
+    AutoEcoModeGet = "auto_eco_mode_get"
     EcoModeEco = "eco_mode_eco"
     EcoModeNormal = "eco_mode_normal"
+    EcoModeGet = "eco_mode_get"
     PowerTurnOn = "power_turn_on"
     PowerTurnOff = "power_turn_off"
     PowerGet = "power_get"
@@ -44,8 +56,10 @@ class Command(Enum):
 commands = {
     Command.AutoEcoModeOff: bytes.fromhex("BE EF 03 06 00 FB 27 01 00 10 33 00 00"),
     Command.AutoEcoModeOn: bytes.fromhex("BE EF 03 06 00 6B 26 01 00 10 33 01 00"),
+    Command.AutoEcoModeGet: bytes.fromhex("BE EF 03 06 00 C8 27 02 00 10 33 00 00"),
     Command.EcoModeEco: bytes.fromhex("BE EF 03 06 00 AB 22 01 00 00 33 01 00"),
     Command.EcoModeNormal: bytes.fromhex("BE EF 03 06 00 3B 23 01 00 00 33 00 00"),
+    Command.EcoModeGet: bytes.fromhex("BE EF 03 06 00 08 23 02 00 00 33 00 00"),
     Command.PowerTurnOff: bytes.fromhex("BE EF 03 06 00 2A D3 01 00 00 60 00 00"),
     Command.PowerTurnOn: bytes.fromhex("BE EF 03 06 00 BA D2 01 00 00 60 01 00"),
     Command.PowerGet: bytes.fromhex("BE EF 03 06 00 19 D3 02 00 00 60 00 00"),
@@ -137,19 +151,23 @@ class HitachiProjectorConnection:
         return parse_reply(reply_type, reply)
 
     async def get_power_status(self):
-        reply_type, data = await self.async_send_cmd(commands[Command.PowerGet])
-        if reply_type != ReplyType.DATA or data is None:
-            return reply_type, data
-
-        status = PowerStatus(int.from_bytes(data, byteorder="big"))
-        return (reply_type, status)
+        return await self.__build_get_status(Command.PowerGet, PowerStatus)
 
     async def get_input_source(self):
-        reply_type, data = await self.async_send_cmd(commands[Command.InputSourceGet])
+        return await self.__build_get_status(Command.InputSourceGet, InputSource)
+
+    async def get_eco_mode_status(self):
+        return await self.__build_get_status(Command.EcoModeGet, EcoModeStatus)
+
+    async def get_auto_eco_mode_status(self):
+        return await self.__build_get_status(Command.AutoEcoModeGet, AutoEcoModeStatus)
+
+    async def __build_get_status(self, command, enum):
+        reply_type, data = await self.async_send_cmd(commands[command])
         if reply_type != ReplyType.DATA or data is None:
             return reply_type, data
 
-        status = InputSource(int.from_bytes(data, byteorder="big"))
+        status = enum(int.from_bytes(data, byteorder="big"))
         return (reply_type, status)
 
     def send_cmd(self, cmd):
@@ -189,7 +207,7 @@ async def main():
 
     print(f"Sending cmd: {command}")
 
-    (reply_type, data) = await con.async_send_cmd(commands[command])
+    reply_type, data = await con.async_send_cmd(commands[command])
     match reply_type:
         case ReplyType.ACK:
             pass
