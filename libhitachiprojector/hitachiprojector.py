@@ -127,7 +127,7 @@ class ReplyType(Enum):
     ERROR = 0x1C
     DATA = 0x1D
     BUSY = 0x1F
-    AUTH = 0xFF
+    AUTH = 0xFF  # virtual, this is actually 0x1F too
 
 
 def make_packet(cmd, digest=None):
@@ -180,6 +180,10 @@ def parse_reply(reply_type, reply):
 
             logger.debug(f"Command busy: {status.hex()}")
             return (ReplyType.BUSY, status)
+
+        case _:
+            logger.debug("Command invalid auth")
+            return (ReplyType.AUTH, None)
 
 
 def build_auth_digest(nonce, password):
