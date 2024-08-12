@@ -12,9 +12,21 @@ logger = logging.getLogger(__name__)
 
 
 class PowerStatus(Enum):
-    Off = 0
-    On = 1
-    CoolDown = 2
+    Off = 0x0000
+    On = 0x0100
+    CoolDown = 0x0200
+
+
+class InputSource(Enum):
+    ComputerIn1 = 0x0000
+    ComputerIn2 = 0x0400
+    HDMI = 0x0300
+    Component = 0x0500
+    SVideo = 0x0200
+    Video = 0x0100
+    USBTypeA = 0x0600
+    LAN = 0x0B00
+    USBTypeB = 0x0C00
 
 
 class Command(Enum):
@@ -25,6 +37,8 @@ class Command(Enum):
     PowerTurnOn = "power_turn_on"
     PowerTurnOff = "power_turn_off"
     PowerGet = "power_get"
+    GammaGet = "gamma_get"
+    InputSourceGet = "input_source_get"
 
 
 commands = {
@@ -35,6 +49,8 @@ commands = {
     Command.PowerTurnOff: bytes.fromhex("BE EF 03 06 00 2A D3 01 00 00 60 00 00"),
     Command.PowerTurnOn: bytes.fromhex("BE EF 03 06 00 BA D2 01 00 00 60 01 00"),
     Command.PowerGet: bytes.fromhex("BE EF 03 06 00 19 D3 02 00 00 60 00 00"),
+    Command.GammaGet: bytes.fromhex("BE EF 03 06 00 F4 F0 02 00 A1 30 00 00"),
+    Command.InputSourceGet: bytes.fromhex("BE EF 03 06 00 CD D2 02 00 00 20 00 00"),
 }
 
 
@@ -162,8 +178,15 @@ async def main():
             assert data is not None
             match command:
                 case Command.PowerGet:
-                    status = PowerStatus(int.from_bytes(data, byteorder="little"))
+                    status = PowerStatus(int.from_bytes(data, byteorder="big"))
                     print(f"Power status: {status}")
+
+                case Command.InputSourceGet:
+                    status = InputSource(int.from_bytes(data, byteorder="big"))
+                    print(f"Input source: {status}")
+
+                case _:
+                    print(f"Command reply: {data}")
 
         case _:
             print(f"bad response: {reply_type}, {data}")
