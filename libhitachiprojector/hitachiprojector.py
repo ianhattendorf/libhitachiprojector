@@ -44,6 +44,17 @@ class BlankStatus(Enum):
     On = 0x0100
 
 
+class ErrorStatus(Enum):
+    Normal = 0x0000
+    Cover = 0x0100
+    Fan = 0x0200
+    Lamp = 0x0300
+    Temp = 0x0400
+    AirFlow = 0x0500
+    Cold = 0x0700
+    Filter = 0x0800
+
+
 class Command(Enum):
     AutoEcoModeOn = "auto_eco_mode_on"
     AutoEcoModeOff = "auto_eco_mode_off"
@@ -54,6 +65,7 @@ class Command(Enum):
     EcoModeEco = "eco_mode_eco"
     EcoModeNormal = "eco_mode_normal"
     EcoModeGet = "eco_mode_get"
+    ErrorStatusGet = "error_status_get"
     PowerTurnOn = "power_turn_on"
     PowerTurnOff = "power_turn_off"
     PowerGet = "power_get"
@@ -71,6 +83,7 @@ commands = {
     Command.EcoModeEco: bytes.fromhex("BE EF 03 06 00 AB 22 01 00 00 33 01 00"),
     Command.EcoModeNormal: bytes.fromhex("BE EF 03 06 00 3B 23 01 00 00 33 00 00"),
     Command.EcoModeGet: bytes.fromhex("BE EF 03 06 00 08 23 02 00 00 33 00 00"),
+    Command.ErrorStatusGet: bytes.fromhex("BE EF 03 06 00 D9 D8 02 00 20 60 00 00"),
     Command.PowerTurnOff: bytes.fromhex("BE EF 03 06 00 2A D3 01 00 00 60 00 00"),
     Command.PowerTurnOn: bytes.fromhex("BE EF 03 06 00 BA D2 01 00 00 60 01 00"),
     Command.PowerGet: bytes.fromhex("BE EF 03 06 00 19 D3 02 00 00 60 00 00"),
@@ -175,6 +188,9 @@ class HitachiProjectorConnection:
 
     async def get_blank_status(self):
         return await self.__build_get_status(Command.BlankGet, BlankStatus)
+
+    async def get_error_status(self):
+        return await self.__build_get_status(Command.ErrorStatusGet, ErrorStatus)
 
     async def __build_get_status(self, command, enum):
         reply_type, data = await self.async_send_cmd(commands[command])
