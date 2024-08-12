@@ -1,6 +1,6 @@
 [project]
 name = "libhitachiprojector"
-version = "0.0.4"
+version = "0.0.5"
 authors = [
   { name="Ian Hattendorf", email="ian@ianhattendorf.com" },
 ]
