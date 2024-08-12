@@ -39,10 +39,18 @@ class AutoEcoModeStatus(Enum):
     On = 0x0100
 
 
+class BlankStatus(Enum):
+    Off = 0x0000
+    On = 0x0100
+
+
 class Command(Enum):
     AutoEcoModeOn = "auto_eco_mode_on"
     AutoEcoModeOff = "auto_eco_mode_off"
     AutoEcoModeGet = "auto_eco_mode_get"
+    BlankOn = "blank_on"
+    BlankOff = "blank_off"
+    BlankGet = "blank_get"
     EcoModeEco = "eco_mode_eco"
     EcoModeNormal = "eco_mode_normal"
     EcoModeGet = "eco_mode_get"
@@ -57,6 +65,9 @@ commands = {
     Command.AutoEcoModeOff: bytes.fromhex("BE EF 03 06 00 FB 27 01 00 10 33 00 00"),
     Command.AutoEcoModeOn: bytes.fromhex("BE EF 03 06 00 6B 26 01 00 10 33 01 00"),
     Command.AutoEcoModeGet: bytes.fromhex("BE EF 03 06 00 C8 27 02 00 10 33 00 00"),
+    Command.BlankOff: bytes.fromhex("BE EF 03 06 00 FB D8 01 00 20 30 00 00"),
+    Command.BlankOn: bytes.fromhex("BE EF 03 06 00 6B D9 01 00 20 30 01 00"),
+    Command.BlankGet: bytes.fromhex("BE EF 03 06 00 C8 D8 02 00 20 30 00 00"),
     Command.EcoModeEco: bytes.fromhex("BE EF 03 06 00 AB 22 01 00 00 33 01 00"),
     Command.EcoModeNormal: bytes.fromhex("BE EF 03 06 00 3B 23 01 00 00 33 00 00"),
     Command.EcoModeGet: bytes.fromhex("BE EF 03 06 00 08 23 02 00 00 33 00 00"),
@@ -161,6 +172,9 @@ class HitachiProjectorConnection:
 
     async def get_auto_eco_mode_status(self):
         return await self.__build_get_status(Command.AutoEcoModeGet, AutoEcoModeStatus)
+
+    async def get_blank_status(self):
+        return await self.__build_get_status(Command.BlankGet, BlankStatus)
 
     async def __build_get_status(self, command, enum):
         reply_type, data = await self.async_send_cmd(commands[command])
