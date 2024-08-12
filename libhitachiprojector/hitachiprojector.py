@@ -123,6 +123,10 @@ class HitachiProjectorConnection:
         logger.debug("reading")
         reply = await reader.read(256)
         logger.debug(f"data=f{reply.hex()}")
+
+        writer.close()
+        await writer.wait_closed()
+
         reply_type = ReplyType(reply[0])
 
         this_connection = connection_id == reply[-1]
