@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 from enum import Enum
+from hashlib import md5
 import logging
 import os
 import secrets
@@ -120,11 +121,23 @@ commands = {
 }
 
 
-def make_packet(cmd):
+class ReplyType(Enum):
+    ACK = 0x06
+    NACK = 0x15
+    ERROR = 0x1C
+    DATA = 0x1D
+    BUSY = 0x1F
+    AUTH = 0xFF
+
+
+def make_packet(cmd, digest=None):
     HEADER = 0x02
     DATA_LENGTH = 0x0D
 
-    packet = bytearray([HEADER, DATA_LENGTH])
+    packet = bytearray()
+    if digest:
+        packet.extend(digest)
+    packet.extend([HEADER, DATA_LENGTH])
     packet.extend(cmd)
 
     checksum = (255 - ((packet[0] + packet[1] + packet[-1]) & 0xFF)).to_bytes(1)
@@ -137,14 +150,6 @@ def make_packet(cmd):
         f"checksum={checksum},connection_id={connection_id},packet={packet.hex()}"
     )
     return (packet, connection_id)
-
-
-class ReplyType(Enum):
-    ACK = 0x06
-    NACK = 0x15
-    ERROR = 0x1C
-    DATA = 0x1D
-    BUSY = 0x1F
 
 
 def parse_reply(reply_type, reply):
@@ -169,17 +174,32 @@ def parse_reply(reply_type, reply):
 
         case ReplyType.BUSY:
             status = reply[1:3]
+            if status == bytes([0x04, 0x00]):
+                logger.debug("Command invalid auth")
+                return (ReplyType.AUTH, None)
+
             logger.debug(f"Command busy: {status.hex()}")
             return (ReplyType.BUSY, status)
 
 
+def build_auth_digest(nonce, password):
+    content = bytearray()
+    content.extend(nonce)
+    content.extend(bytes(password, "utf-8"))
+
+    hash_context = md5()
+    hash_context.update(content)
+    return bytes(hash_context.hexdigest(), "utf-8")
+
+
 class HitachiProjectorConnection:
-    def __init__(self, host):
+    def __init__(self, host, password):
         self.host = host
+        self.password = password
 
     async def async_send_cmd(self, cmd):
         logger.debug("async connecting")
-        (packet, connection_id) = make_packet(cmd)
+        packet, connection_id = make_packet(cmd)
         reader, writer = await asyncio.open_connection(self.host, PORT)
 
         logger.debug("sending")
@@ -188,7 +208,31 @@ class HitachiProjectorConnection:
 
         logger.debug("reading")
         reply = await reader.read(256)
-        logger.debug(f"data=f{reply.hex()}")
+        logger.debug(f"data={reply.hex()}")
+
+        # Check if auth required
+        if len(reply) == 8:
+            logger.debug("reading expected auth failure")
+            expected_auth_failure_reply = await reader.read(256)
+            logger.debug(f"data={expected_auth_failure_reply.hex()}")
+            if expected_auth_failure_reply != bytes([0x1F, 0x04, 0x00, connection_id]):
+                raise RuntimeError("Unexpected auth failure response")
+
+            if self.password is None:
+                raise RuntimeError("Auth required but missing password")
+
+            digest = build_auth_digest(reply, self.password)
+            logger.debug(f"reply: {reply.hex()}, digest: {digest}")
+
+            packet, connection_id = make_packet(cmd, digest)
+
+            logger.debug("sending with digest")
+            writer.write(packet)
+            await writer.drain()
+
+            logger.debug("reading")
+            reply = await reader.read(256)
+            logger.debug(f"data={reply.hex()}")
 
         writer.close()
         await writer.wait_closed()
@@ -197,7 +241,9 @@ class HitachiProjectorConnection:
 
         this_connection = connection_id == reply[-1]
         if not this_connection:
-            logger.debug("Received reply for other connection")
+            logger.debug(
+                f"Received reply for other connection: {connection_id} != {reply[-1]}"
+            )
             return (False, None)
 
         return parse_reply(reply_type, reply)
@@ -228,27 +274,6 @@ class HitachiProjectorConnection:
         status = enum(int.from_bytes(data, byteorder="big"))
         return (reply_type, status)
 
-    def send_cmd(self, cmd):
-        (packet, connection_id) = make_packet(cmd)
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            logger.debug("connecting")
-            s.connect((self.host, PORT))
-
-            logger.debug("sending")
-            s.sendall(packet)
-            logger.debug("sent")
-
-            reply = s.recv(256)
-            logger.debug(f"data=f{reply.hex()}")
-            reply_type = ReplyType(reply[0])
-
-            this_connection = connection_id == reply[-1]
-            if not this_connection:
-                logger.debug("Received reply for other connection")
-                return (False, None)
-
-            return parse_reply(reply_type, reply)
-
 
 async def main():
     logging.basicConfig(level=os.environ.get("LOG", logging.INFO))
@@ -258,10 +283,11 @@ async def main():
     parser.add_argument(
         "command", choices=list(map(lambda key: key.value, commands.keys()))
     )
+    parser.add_argument("-p", "--password")
     args = parser.parse_args()
     command = Command(args.command)
 
-    con = HitachiProjectorConnection(host=args.host)
+    con = HitachiProjectorConnection(host=args.host, password=args.password)
 
     print(f"Sending cmd: {command}")
 
